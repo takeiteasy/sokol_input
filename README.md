@@ -1,9 +1,14 @@
 # sokol_input.h
 
 > [!WARNING]
-> Work in progress
+> Work in progress, functional
 
 Input handler for [sokol](https://github.com/floooh/sokol/). Instead of manually managing events, this library will keep track of the keyboard and mouse state.
+
+## TODO
+
+- [ ] Gamepad support
+- [ ] Key mapping + events
 
 ## LICENSE
 ```
