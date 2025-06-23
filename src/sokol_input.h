@@ -33,19 +33,7 @@ extern "C" {
 #endif
 #endif
 
-#ifndef SOKOL_TIME_INCLUDED
-#if __has_include("sokol_time.h")
-#include "sokol_time.h"
-#else
-#error Please include sokol_time.h before the sokol_input.h implementation
-#endif
-#endif
-
 #include <stdarg.h>
-
-#ifndef DEFAULT_KEY_HOLD_DELAY
-#define DEFAULT_KEY_HOLD_DELAY 1
-#endif
 
 // Assign sapp_desc.event_cb = sapp_input_event
 // Or just pass the event to it inside the callback
@@ -56,9 +44,6 @@ void sapp_input_flush(void);
 void sapp_input_init(void);
 
 bool sapp_is_key_down(int key);
-// This will be true if a key is held for more than 1 second
-// TODO: Make the duration configurable
-bool sapp_is_key_held(int key);
 // Returns true if key is down this frame and was up last frame
 bool sapp_was_key_pressed(int key);
 // Returns true if key is up and key was down last frame
@@ -68,7 +53,6 @@ bool sapp_are_keys_down(int n, ...);
 // If none of the keys passed are down returns false
 bool sapp_any_keys_down(int n, ...);
 bool sapp_is_button_down(int button);
-bool sapp_is_button_held(int button);
 bool sapp_was_button_pressed(int button);
 bool sapp_was_button_released(int button);
 bool sapp_are_buttons_down(int n, ...);
@@ -84,27 +68,40 @@ bool sapp_check_scrolled(void);
 float sapp_scroll_x(void);
 float sapp_scroll_y(void);
 
+#ifndef SOKOL_INPUT_NO_GAMEPADS
+#ifndef SOKOL_GAMEPAD_MAX
+#define SOKOL_GAMEPAD_MAX 1
+#endif
+
+int sapp_gamepad_count(void);
+bool sapp_gamepad_is_connected(void);
+void sapp_gamepad_disconnect(void);
+void sapp_gamepad_disconnect_id(int gid);
+bool sapp_gamepad_is_connected_id(int gid);
+bool sapp_gamepad_is_button_down(int button);
+bool sapp_gamepad_is_button_down_id(int gid, int button);
+bool sapp_gamepad_is_button_up(int button);
+bool sapp_gamepad_is_button_up_id(int gid, int button);
+bool sapp_gamepad_was_button_pressed(int button);
+bool sapp_gamepad_was_button_pressed_id(int gid, int button);
+bool sapp_gamepad_was_button_released(int button);
+bool sapp_gamepad_was_button_released_id(int gid, int button);
+float sapp_gamepad_axis_x(void);
+float sapp_gamepad_axis_x_id(int gid);
+float sapp_gamepad_axis_y(void);
+float sapp_gamepad_axis_y_id(int gid);
+float sapp_gamepad_axis_delta_x(void);
+float sapp_gamepad_axis_delta_x_id(int gid);
+float sapp_gamepad_axis_delta_y(void);
+float sapp_gamepad_axis_delta_y_id(int gid);
+#endif
+
 bool sapp_input_check_str_down(const char *str);
 bool sapp_input_check_down(int modifiers, int n, ...);
 bool sapp_input_check_str_released(const char *str);
 bool sapp_input_check_released(int modifiers, int n, ...);
 bool sapp_input_check_str_up(const char *str);
 bool sapp_input_check_up(int modifiers, int n, ...);
-
-#ifndef SOKOL_INPUT_NO_GAMEPADS
-#endif
-
-#ifndef MAX_KB_STATE_KEYS
-#define MAX_KB_STATE_KEYS 8
-#endif
-
-typedef struct sapp_keyboard_state {
-    int keys[MAX_KB_STATE_KEYS];
-    int modifiers;
-} sapp_keyboard_state;
-
-bool sapp_input_create_state(sapp_keyboard_state *dst, int modifiers, int n, ...);
-bool sapp_input_create_state_str(sapp_keyboard_state *dst, const char *str);
 
 #if defined(__cplusplus)
 }
@@ -117,15 +114,67 @@ bool sapp_input_create_state_str(sapp_keyboard_state *dst, const char *str);
 #include <stddef.h>
 #include <assert.h>
 #include <stdlib.h>
+#ifndef SOKOL_INPUT_NO_GAMEPADS
+// INCLUDES
+#include "gamepad/Gamepad.h"
+#include "gamepad/Gamepad_private.h"
+#include "gamepad/Gamepad_private.c"
+#if defined(macintosh) || defined(Macintosh) || (defined(__APPLE__) && defined(__MACH__))
+#include "gamepad/Gamepad_macosx.c"
+#elif defined(_WIN32) || defined(_WIN64) || defined(__WIN32__) || defined(__WINDOWS__)
+#ifndef SOKOL_INPUT_GAMEPAD_WINDOWS_USE_MM
+#include "gamepad/Gamepad_windows_dinput.c"
+#else
+#include "gamepad/Gamepad_windows_mm.c"
+#endif
+#elif defined(__gnu_linux__) || defined(__linux__) || defined(__unix__)
+#include "gamepad/Gamepad_linux.c"
+#else
+#error This platform is not supported
+#endif
+#endif // SOKOL_INPUT_NO_GAMEPADS
+
+#ifndef SOKOL_KEY_HOLD_DELAY
+#define SOKOL_KEY_HOLD_DELAY 1.f
+#endif
+
+#ifndef FLT_EPSILON
+#define FLT_EPSILON 0.000001f
+#endif
+
+static bool float_cmp(float a, float b) {
+    return fabsf(a - b) <= FLT_EPSILON * fmaxf(1.f, fmaxf(fabsf(a), fabsf(b)));
+}
+
+#define _MAX(A, B)    ((A) > (B) ? (A) : (B))
+
+#define __vector_raw(a)              ((int *) (a) - 2)
+#define __vector_m(a)                __vector_raw(a)[0]
+#define __vector_n(a)                __vector_raw(a)[1]
+
+#define __vector_needgrow(a,n)       ((a)==0 || __vector_n(a)+n >= __vector_m(a))
+#define __vector_grow(a,n)           __grow_vector((void **) &(a), (n), sizeof(*(a)))
+#define __vector_maybegrow(a,n)      (__vector_needgrow(a,(n)) ? __vector_grow(a,n) : 0)
+
+#define vector_free(a)               ((a) ? free(__vector_raw(a)),0 : 0)
+#define vector_append(a, v)          (__vector_maybegrow(a,1), (a)[__vector_n(a)++] = (v))
+#define vector_count(a)              ((a) ? __vector_n(a) : 0)
+
+static void __grow_vector(void **arr, int increment, int itemsize) {
+    int m = *arr ? 2 * __vector_m(*arr) + increment : increment + 1;
+    void *p = (void*)realloc(*arr ? __vector_raw(*arr) : 0, itemsize * m + sizeof(int) * 2);
+    assert(p);
+    if (p) {
+        if (!*arr)
+            ((int *)p)[1] = 0;
+        *arr = (void*)((int*)p + 2);
+        __vector_m(*arr) = m;
+    }
+}
 
 typedef struct {
-    int down;
-    uint64_t timestamp;
-} input_action_state_t;
-
-typedef struct {
-    input_action_state_t keys[SAPP_KEYCODE_MENU+1];
-    input_action_state_t buttons[3];
+    bool keys[SAPP_KEYCODE_MENU+1];
+    bool buttons[3];
     int modifier;
     struct {
         int x, y;
@@ -139,23 +188,182 @@ static struct {
     _state input_prev, input_current;
 } _input_state;
 
+#ifndef SOKOL_INPUT_NO_GAMEPADS
+typedef struct {
+    bool *buttons;
+    float axis[2];
+} _gamepad_state;
+
+typedef struct {
+    int button_count;
+    int axis_count;
+    bool attached;
+    _gamepad_state current, previous;
+} _gamepad_states;
+
+static struct {
+    struct Gamepad_device* devices[SOKOL_GAMEPAD_MAX];
+    _gamepad_states states[SOKOL_GAMEPAD_MAX];
+} _gstate;
+
+static void _gamepad_attach(struct Gamepad_device *device, void *context) {
+    _gstate.devices[device->deviceID] = device;
+    _gamepad_states *_state = &_gstate.states[device->deviceID];
+    memset(_state, 0, sizeof(_gamepad_states));
+    _state->attached = true;
+    _state->button_count = device->numButtons;
+    _state->axis_count = device->numAxes;
+    memcpy(&_state->previous, &_state->current, sizeof(_gamepad_state));
+    size_t size = device->numButtons * sizeof(bool);
+    _state->current.buttons = malloc(size);
+    _state->previous.buttons = malloc(size);
+    memset(_state->current.buttons, 0, size);
+    memset(_state->previous.buttons, 0, size);
+}
+
+static void _gamepad_detach(struct Gamepad_device *device, void *context) {
+    _gstate.devices[device->deviceID] = NULL;
+    free(_gstate.states[device->deviceID].current.buttons);
+    free(_gstate.states[device->deviceID].previous.buttons);
+    memset(&_gstate.states[device->deviceID], 0, sizeof(_gamepad_states));
+}
+
+static void _gamepad_btn_down(struct Gamepad_device *device, unsigned int buttonID, double timestamp, void *context) {
+    if (device->deviceID < SOKOL_GAMEPAD_MAX && buttonID < _gstate.states[device->deviceID].button_count)
+        _gstate.states[device->deviceID].current.buttons[buttonID] = true;
+}
+
+static void _gamepad_btn_up(struct Gamepad_device *device, unsigned int buttonID, double timestamp, void *context) {
+    if (device->deviceID < SOKOL_GAMEPAD_MAX && buttonID < _gstate.states[device->deviceID].button_count)
+        _gstate.states[device->deviceID].current.buttons[buttonID] = false;
+}
+
+static void _gamepad_axis_move(struct Gamepad_device *device, unsigned int axisID, float value, float lastValue, double timestamp, void *context) {
+    if (device->deviceID < SOKOL_GAMEPAD_MAX && axisID < _MAX(2, _gstate.states[device->deviceID].axis_count))
+        _gstate.states[device->deviceID].current.axis[axisID] = value;
+}
+
+int sapp_gamepad_count(void) {
+    return Gamepad_numDevices();
+}
+
+bool sapp_gamepad_is_connected(void) {
+    return sapp_gamepad_is_connected_id(0);
+}
+
+void sapp_gamepad_disconnect(void) {
+    sapp_gamepad_disconnect_id(0);
+}
+
+void sapp_gamepad_disconnect_id(int gid) {
+    if (gid >= 0 && gid < SOKOL_GAMEPAD_MAX && _gstate.devices[gid] != NULL) {
+        _gstate.devices[gid] = NULL;
+        free(_gstate.states[gid].current.buttons);
+        free(_gstate.states[gid].previous.buttons);
+        memset(&_gstate.states[gid], 0, sizeof(_gamepad_states));
+    }
+}
+
+bool sapp_gamepad_is_connected_id(int gid) {
+    return gid >= 0 && gid < SOKOL_GAMEPAD_MAX ? _gstate.states[gid].attached : false;
+}
+
+bool sapp_gamepad_is_button_down(int button) {
+    return sapp_gamepad_is_button_down_id(0, button);
+}
+
+bool sapp_gamepad_is_button_down_id(int gid, int button) {
+    return gid >= 0 && gid < SOKOL_GAMEPAD_MAX && button >= 0 && button < _gstate.states[gid].button_count ? _gstate.states[gid].current.buttons[button] : false;
+}
+
+bool sapp_gamepad_is_button_up(int button) {
+    return sapp_gamepad_is_button_up_id(0, button);
+}
+
+bool sapp_gamepad_is_button_up_id(int gid, int button) {
+    return !sapp_gamepad_is_button_down_id(0, button);
+}
+
+bool sapp_gamepad_was_button_pressed(int button) {
+    return sapp_gamepad_was_button_pressed_id(0, button);
+}
+
+bool sapp_gamepad_was_button_pressed_id(int gid, int button) {
+    if (gid >= 0 && gid < SOKOL_GAMEPAD_MAX && button >= 0 && button < _gstate.states[gid].button_count)
+        return sapp_gamepad_is_button_down_id(gid, button) && !_gstate.states[gid].previous.buttons[button];
+    else
+        return false;
+}
+
+bool sapp_gamepad_was_button_released(int button) {
+    return sapp_gamepad_was_button_released_id(0, button);
+}
+
+bool sapp_gamepad_was_button_released_id(int gid, int button) {
+    if (gid >= 0 && gid < SOKOL_GAMEPAD_MAX && button >= 0 && button < _gstate.states[gid].button_count)
+        return !sapp_gamepad_is_button_down_id(gid, button) && _gstate.states[gid].previous.buttons[button];
+    else
+        return false;
+}
+
+float sapp_gamepad_axis_x(void) {
+    return sapp_gamepad_axis_x_id(0);
+}
+
+float sapp_gamepad_axis_x_id(int gid) {
+    return gid >= 0 && gid < SOKOL_GAMEPAD_MAX ? _gstate.states[gid].current.axis[0] : 0.f;
+}
+
+float sapp_gamepad_axis_y(void) {
+    return sapp_gamepad_axis_y_id(0);
+}
+
+float sapp_gamepad_axis_y_id(int gid) {
+    return gid >= 0 && gid < SOKOL_GAMEPAD_MAX ? _gstate.states[gid].current.axis[1] : 0.f;
+}
+
+float sapp_gamepad_axis_delta_x(void) {
+    return sapp_gamepad_axis_delta_x_id(0);
+}
+
+float sapp_gamepad_axis_delta_x_id(int gid) {
+    return gid >= 0 && gid < SOKOL_GAMEPAD_MAX ? _gstate.states[gid].current.axis[0] - _gstate.states[gid].previous.axis[0] : 0.f;
+}
+
+float sapp_gamepad_axis_delta_y(void) {
+    return sapp_gamepad_axis_delta_y_id(0);
+}
+
+float sapp_gamepad_axis_delta_y_id(int gid) {
+    return gid >= 0 && gid < SOKOL_GAMEPAD_MAX ? _gstate.states[gid].current.axis[1] - _gstate.states[gid].previous.axis[1] : 0.f;
+}
+#endif
+
 void sapp_input_init(void) {
     memset(&_input_state.input_prev,    0, sizeof(_state));
     memset(&_input_state.input_current, 0, sizeof(_state));
+#ifndef SOKOL_INPUT_NO_GAMEPADS
+    memset(&_gstate, 0, sizeof(_gstate));
+    Gamepad_deviceAttachFunc(_gamepad_attach, NULL);
+    Gamepad_deviceRemoveFunc(_gamepad_detach, NULL);
+    Gamepad_buttonUpFunc(_gamepad_btn_up, NULL);
+    Gamepad_buttonDownFunc(_gamepad_btn_down, NULL);
+    Gamepad_axisMoveFunc(_gamepad_axis_move, NULL);
+    Gamepad_init();
+    Gamepad_detectDevices();
+#endif
 }
 
 void sapp_input_event(const sapp_event* e) {
     switch (e->type) {
         case SAPP_EVENTTYPE_KEY_UP:
         case SAPP_EVENTTYPE_KEY_DOWN:
-            _input_state.input_current.keys[e->key_code].down = e->type == SAPP_EVENTTYPE_KEY_DOWN;
-            _input_state.input_current.keys[e->key_code].timestamp = stm_now();
+            _input_state.input_current.keys[e->key_code] = e->type == SAPP_EVENTTYPE_KEY_DOWN;
             _input_state.input_current.modifier = e->modifiers;
             break;
         case SAPP_EVENTTYPE_MOUSE_UP:
         case SAPP_EVENTTYPE_MOUSE_DOWN:
-            _input_state.input_current.buttons[e->mouse_button].down = e->type == SAPP_EVENTTYPE_MOUSE_DOWN;
-            _input_state.input_current.buttons[e->mouse_button].timestamp = stm_now();
+            _input_state.input_current.buttons[e->mouse_button] = e->type == SAPP_EVENTTYPE_MOUSE_DOWN;
             break;
         case SAPP_EVENTTYPE_MOUSE_MOVE:
             _input_state.input_current.cursor.x = e->mouse_x;
@@ -174,22 +382,28 @@ void sapp_input_event(const sapp_event* e) {
 void sapp_input_flush(void) {
     memcpy(&_input_state.input_prev, &_input_state.input_current, sizeof(_state));
     _input_state.input_current.scroll.x = _input_state.input_current.scroll.y = 0.f;
+#ifndef SOKOL_INPUT_NO_GAMEPADS
+    for (int i = 0; i < SOKOL_GAMEPAD_MAX; i++) {
+        size_t size  = _gstate.states[i].button_count * sizeof(bool);
+        memcpy(&_gstate.states[i].previous.buttons, &_gstate.states[i].current.buttons, size);
+        memset(&_gstate.states[i].current.buttons, 0, size);
+        memset(&_gstate.states[i].current.axis, 0, 2 * sizeof(float));
+    }
+    Gamepad_processEvents();
+    Gamepad_detectDevices();
+#endif
 }
 
 bool sapp_is_key_down(int key) {
-    return _input_state.input_current.keys[key].down == 1;
-}
-
-bool sapp_is_key_held(int key) {
-    return sapp_is_key_down(key) && stm_sec(stm_since(_input_state.input_current.keys[key].timestamp)) > 1;
+    return _input_state.input_current.keys[key];
 }
 
 bool sapp_was_key_pressed(int key) {
-    return sapp_is_key_down(key) && !_input_state.input_prev.keys[key].down;
+    return sapp_is_key_down(key) && !_input_state.input_prev.keys[key];
 }
 
 bool sapp_was_key_released(int key) {
-    return !sapp_is_key_down(key) && _input_state.input_prev.keys[key].down;
+    return !sapp_is_key_down(key) && _input_state.input_prev.keys[key];
 }
 
 bool sapp_are_keys_down(int n, ...) {
@@ -197,7 +411,7 @@ bool sapp_are_keys_down(int n, ...) {
     va_start(args, n);
     int result = 1;
     for (int i = 0; i < n; i++)
-        if (!_input_state.input_current.keys[va_arg(args, int)].down) {
+        if (!_input_state.input_current.keys[va_arg(args, int)]) {
             result = 0;
             goto BAIL;
         }
@@ -211,7 +425,7 @@ bool sapp_any_keys_down(int n, ...) {
     va_start(args, n);
     int result = 0;
     for (int i = 0; i < n; i++)
-        if (_input_state.input_current.keys[va_arg(args, int)].down) {
+        if (_input_state.input_current.keys[va_arg(args, int)]) {
             result = 1;
             goto BAIL;
         }
@@ -221,19 +435,15 @@ BAIL:
 }
 
 bool sapp_is_button_down(int button) {
-    return _input_state.input_current.buttons[button].down;
-}
-
-bool sapp_is_button_held(int button) {
-    return sapp_is_button_down(button) && stm_sec(stm_since(_input_state.input_current.buttons[button].timestamp)) > 1;
+    return _input_state.input_current.buttons[button];
 }
 
 bool sapp_was_button_pressed(int button) {
-    return sapp_is_button_down(button) && !_input_state.input_prev.buttons[button].down;
+    return sapp_is_button_down(button) && !_input_state.input_prev.buttons[button];
 }
 
 bool sapp_was_button_released(int button) {
-    return !sapp_is_button_down(button) && _input_state.input_prev.buttons[button].down;
+    return !sapp_is_button_down(button) && _input_state.input_prev.buttons[button];
 }
 
 bool sapp_are_buttons_down(int n, ...) {
@@ -241,7 +451,7 @@ bool sapp_are_buttons_down(int n, ...) {
     va_start(args, n);
     int result = 1;
     for (int i = 0; i < n; i++)
-        if (!_input_state.input_current.buttons[va_arg(args, int)].down) {
+        if (!_input_state.input_current.buttons[va_arg(args, int)]) {
             result = 0;
             goto BAIL;
         }
@@ -255,7 +465,7 @@ bool sapp_any_buttons_down(int n, ...) {
     va_start(args, n);
     int result = 0;
     for (int i = 0; i < n; i++)
-        if (_input_state.input_current.buttons[va_arg(args, int)].down) {
+        if (_input_state.input_current.buttons[va_arg(args, int)]) {
             result = 1;
             goto BAIL;
         }
@@ -475,30 +685,6 @@ static int translate_word(input_parser_t *p, bool *is_modifier) {
     return -1;
 }
 
-#define __vector_raw(a)              ((int *) (a) - 2)
-#define __vector_m(a)                __vector_raw(a)[0]
-#define __vector_n(a)                __vector_raw(a)[1]
-
-#define __vector_needgrow(a,n)       ((a)==0 || __vector_n(a)+n >= __vector_m(a))
-#define __vector_grow(a,n)           __grow_vector((void **) &(a), (n), sizeof(*(a)))
-#define __vector_maybegrow(a,n)      (__vector_needgrow(a,(n)) ? __vector_grow(a,n) : 0)
-
-#define vector_free(a)               ((a) ? free(__vector_raw(a)),0 : 0)
-#define vector_append(a, v)          (__vector_maybegrow(a,1), (a)[__vector_n(a)++] = (v))
-#define vector_count(a)              ((a) ? __vector_n(a) : 0)
-
-static void __grow_vector(void **arr, int increment, int itemsize) {
-    int m = *arr ? 2 * __vector_m(*arr) + increment : increment + 1;
-    void *p = (void*)realloc(*arr ? __vector_raw(*arr) : 0, itemsize * m + sizeof(int) * 2);
-    assert(p);
-    if (p) {
-        if (!*arr)
-            ((int *)p)[1] = 0;
-        *arr = (void*)((int*)p + 2);
-        __vector_m(*arr) = m;
-    }
-}
-
 static void parser_add_key(input_parser_t *p, int key) {
     bool found = false;
     for (int i = 0; i < vector_count(p->keys); i++)
@@ -579,45 +765,6 @@ static int* _vaargs(int n, va_list args) {
     }
     va_end(args);
     return result;
-}
-
-#define _MIN(A, B) ((A) < (B) ? (A) : (B))
-
-bool sapp_input_create_state(sapp_keyboard_state *dst, int modifiers, int n, ...) {
-    dst->modifiers = modifiers;
-    va_list args;
-    va_start(args, n);
-    int *tmp = _vaargs(n, args);
-    if (tmp) {
-        vector_free(tmp);
-        return false;
-    }
-    for (int i = 0; i < MAX_KB_STATE_KEYS; i++)
-        dst->keys[i] = -1;
-    int max = _MIN(vector_count(tmp), MAX_KB_STATE_KEYS);
-    memcpy(dst->keys, tmp, max * sizeof(int));
-    vector_free(tmp);
-    return true;
-}
-
-bool sapp_input_create_state_str(sapp_keyboard_state *dst, const char *str) {
-    dst->modifiers = -1;
-    for (int i = 0; i < MAX_KB_STATE_KEYS; i++)
-        dst->keys[i] = -1;
-
-    input_parser_t p;
-    memset(&p, 0, sizeof(input_parser_t));
-    p.original = p.offset = p.cursor = str;
-    if (!parse_input_str(&p) || (!p.modifiers && !p.keys))
-        return false;
-    if (p.modifiers)
-        dst->modifiers = p.modifiers;
-    if (p.keys) {
-        int max = _MIN(vector_count(p.keys), MAX_KB_STATE_KEYS);
-        memcpy(dst->keys, p.keys, max * sizeof(int));
-        vector_free(p.keys);
-    }
-    return true;
 }
 
 bool sapp_input_check_str_down(const char *str) {
@@ -764,26 +911,4 @@ BAIL:
         vector_free(tmp);
     return result;
 }
-
-#ifndef SOKOL_INPUT_NO_GAMEPADS
-// INCLUDES
-#include "gamepad/Gamepad.h"
-#include "gamepad/Gamepad_private.h"
-#include "gamepad/Gamepad_private.c"
-#if defined(macintosh) || defined(Macintosh) || (defined(__APPLE__) && defined(__MACH__))
-#include "gamepad/Gamepad_macosx.c"
-#elif defined(_WIN32) || defined(_WIN64) || defined(__WIN32__) || defined(__WINDOWS__)
-#ifndef SOKOL_INPUT_GAMEPAD_WINDOWS_USE_MM
-#include "gamepad/Gamepad_windows_dinput.c"
-#else
-#include "gamepad/Gamepad_windows_mm.c"
-#endif
-#elif defined(__gnu_linux__) || defined(__linux__) || defined(__unix__)
-#include "gamepad/Gamepad_linux.c"
-#else
-#error This platform is not supported
-#endif
-
-// ...
-#endif // SOKOL_INPUT_NO_GAMEPADS
 #endif // SOKOL_IMPL
