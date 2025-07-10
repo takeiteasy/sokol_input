@@ -68,6 +68,12 @@ bool sapp_scrolled(void);
 float sapp_scroll_x(void);
 float sapp_scroll_y(void);
 
+#if defined(__ANDROID__) || \
+    defined(__EMSCRIPTEN__) \
+    (defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE == 1)
+#define SOKOL_INPUT_NO_GAMEPADS
+#endif
+
 #ifndef SOKOL_INPUT_NO_GAMEPADS
 #ifndef SOKOL_GAMEPAD_MAX
 #define SOKOL_GAMEPAD_MAX 1

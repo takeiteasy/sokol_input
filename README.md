@@ -1,6 +1,15 @@
 # sokol_input.h
 
+> [!WARNING]
+> Work in progress, but functional
+
 Input handler for [sokol](https://github.com/floooh/sokol/). Instead of manually managing events, this library will keep track of the keyboard and mouse state. Also includes gamepad support, provided by [ThemsAllTook/libstem_gamepad](https://github.com/ThemsAllTook/libstem_gamepad/) (disable by defining `SOKOL_INPUT_NO_GAMEPADS`).
+
+## TODO
+
+- [ ] Expand on input parser
+- [ ] Input record + playback
+- [ ] Time since functions 
 
 ## LICENSE
 ```
