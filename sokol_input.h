@@ -15,9 +15,17 @@
  You should have received a copy of the GNU General Public License
  along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 
+ /*!
+ @header sokol_input.h
+ @copyright George Watson GPLv3
+ @updated 2025-07-20
+ @abstract Input handling for sokol_app
+ @discussion Provides an input manager for sokol_app, handling keyboard, mouse, and gamepad input.
+ */
+
 #ifndef SOKOL_INPUT_HEADER
 #define SOKOL_INPUT_HEADER
-#if defined(__cplusplus)
+#ifdef __cplusplus
 extern "C" {
 #endif
 
@@ -34,78 +42,367 @@ extern "C" {
 #endif
 
 #include <stdarg.h>
+#include <stdbool.h>
 
-// Assign sapp_desc.event_cb = sapp_input_event
-// Or just pass the event to it inside the callback
+/*!
+ @function sapp_input_event
+ @param event The input event to process.
+ @abstract Call this function to handle input events.
+ @discussion This function should be called in the sapp event callback to process input events.
+             Or it can be used directly by passing it as the event handler in sapp_run.
+ */
 void sapp_input_event(const sapp_event *event);
-// Call this at the end of sapp frame callback
+/*!
+ @function sapp_input_flush
+ @abstract Flush the input state.
+ @discussion Call this function at the end of each frame to update the input state.
+ */
 void sapp_input_flush(void);
-// Clear the input internal state
+/*!
+ @function sapp_input_init
+ @abstract Initialize the input system.
+ @discussion Call this function to initialize the input system. Either before sapp_run or in the sapp init callback.
+ */
 void sapp_input_init(void);
 
+/*!
+ @function sapp_is_key_down
+ @param key The key code to check.
+ @return True if the key is currently pressed down.
+ @abstract Check if a key is currently pressed down.
+ */
 bool sapp_is_key_down(int key);
-// Returns true if key is down this frame and was up last frame
+/*!
+ @function sapp_was_key_pressed
+ @param key The key code to check.
+ @return True if the key was pressed down in the last frame.
+ @abstract Check if a key was pressed down in the last frame.
+ */
 bool sapp_was_key_pressed(int key);
-// Returns true if key is up and key was down last frame
+/*!
+ @function sapp_was_key_released
+ @param key The key code to check.
+ @return True if the key was released in the last frame.
+ @abstract Check if a key was released in the last frame.
+ */
 bool sapp_was_key_released(int key);
-// If any of the keys passed are not down returns false
+/*!
+ @function sapp_are_keys_down
+ @param n The number of keys to check.
+ @param ... The key codes to check.
+ @return True if all the keys are currently pressed down.
+ @abstract Check if multiple keys are currently pressed down.
+ */
 bool sapp_are_keys_down(int n, ...);
-// If none of the keys passed are down returns false
+/*!
+ @function sapp_any_keys_down
+ @param n The number of keys to check.
+ @param ... The key codes to check.
+ @return True if any of the keys are currently pressed down.
+ @abstract Check if any of the keys are currently pressed down.
+ */
 bool sapp_any_keys_down(int n, ...);
+/*!
+ @function sapp_is_button_down
+ @param button The mouse button to check.
+ @return True if the mouse button is currently pressed down.
+ @abstract Check if a mouse button is currently pressed down.
+ */
 bool sapp_is_button_down(int button);
+/*!
+ @function sapp_was_button_pressed
+ @param button The mouse button to check.
+ @return True if the mouse button was pressed down in the last frame.
+ @abstract Check if a mouse button was pressed down in the last frame.
+ */
 bool sapp_was_button_pressed(int button);
+/*!
+ @function sapp_was_button_released
+ @param button The mouse button to check.
+ @return True if the mouse button was released in the last frame.
+ @abstract Check if a mouse button was released in the last frame.
+ */
 bool sapp_was_button_released(int button);
+/*!
+ @function sapp_are_buttons_down
+ @param n The number of buttons to check.
+ @param ... The mouse button codes to check.
+ @return True if all the buttons are currently pressed down.
+ @abstract Check if multiple mouse buttons are currently pressed down.
+ */
 bool sapp_are_buttons_down(int n, ...);
+/*!
+ @function sapp_any_buttons_down
+ @param n The number of buttons to check.
+ @param ... The mouse button codes to check.
+ @return True if any of the buttons are currently pressed down.
+ @abstract Check if any of the mouse buttons are currently pressed down.
+ */
 bool sapp_any_buttons_down(int n, ...);
+/*!
+ @function sapp_has_mouse_move
+ @return True if the mouse has moved since the last frame.
+ @abstract Check if the mouse has moved since the last frame.
+ */
 bool sapp_has_mouse_move(void);
+/*!
+ @function sapp_modifier_equals
+ @param mods The modifier keys to check.
+ @return True if the current modifiers match the specified ones.
+ @abstract Check if the current modifier keys match the specified ones.
+ */
 bool sapp_modifier_equals(int mods);
+/*!
+ @function sapp_modifier_down
+ @param mod The modifier key to check.
+ @return True if the specified modifier key is currently pressed down.
+ @abstract Check if a specific modifier key is currently pressed down.
+ */
 bool sapp_modifier_down(int mod);
+/*!
+ @function sapp_cursor_x
+ @return The current x position of the mouse cursor.
+ @abstract Get the current x position of the mouse cursor.
+ */
 int sapp_cursor_x(void);
+/*!
+ @function sapp_cursor_y
+ @return The current y position of the mouse cursor.
+ @abstract Get the current y position of the mouse cursor.
+ */
 int sapp_cursor_y(void);
-bool sapp_cursor_delta_x(void);
-bool sapp_cursor_delta_y(void);
+/*!
+ @function sapp_cursor_delta_x
+ @return The change in x position of the mouse cursor since the last frame.
+ @abstract Get the change in x position of the mouse cursor since the last frame.
+ */
+int sapp_cursor_delta_x(void);
+/*!
+ @function sapp_cursor_delta_y
+ @return The change in y position of the mouse cursor since the last frame.
+ @abstract Get the change in y position of the mouse cursor since the last frame.
+ */
+int sapp_cursor_delta_y(void);
+/*!
+ @function sapp_scrolled
+ @return True if the mouse wheel has been scrolled since the last frame.
+ @abstract Check if the mouse wheel has been scrolled since the last frame.
+ */
 bool sapp_scrolled(void);
+/*!
+ @function sapp_scroll_x
+ @return The amount the mouse wheel has been scrolled in the x direction since the last frame.
+ @abstract Get the amount the mouse wheel has been scrolled in the x direction since the last frame.
+ */
 float sapp_scroll_x(void);
+/*!
+ @function sapp_scroll_y
+ @return The amount the mouse wheel has been scrolled in the y direction since the last frame.
+ @abstract Get the amount the mouse wheel has been scrolled in the y direction since the last frame.
+ */
 float sapp_scroll_y(void);
+
+#if defined(__ANDROID__) || defined(__EMSCRIPTEN__) || (defined(TARGET_OS_IPHONE) && TARGET_OS_IPHONE == 1)
+/*!
+ @define SOKOL_INPUT_NO_GAMEPADS
+ @abstract Disable gamepad support.
+ @discussion This macro can be defined to disable gamepad support in the sokol_input.h header.
+             It is useful for platforms where gamepad support is not available or not needed.
+             This is automatically defined for Android, Emscripten, and iOS platforms.
+ */
+#define SOKOL_INPUT_NO_GAMEPADS
+#endif
 
 #ifndef SOKOL_INPUT_NO_GAMEPADS
 #ifndef SOKOL_GAMEPAD_MAX
+/*!
+ @define SOKOL_GAMEPAD_MAX
+ @abstract The maximum number of gamepads supported.
+ @discussion This defines the maximum number of gamepads that can be connected at the same time.
+             The default value is 1, but it can be changed to support more gamepads.
+ */
 #define SOKOL_GAMEPAD_MAX 1
 #endif
 
+/*!
+ @function sapp_gamepad_count
+ @return The number of connected gamepads.
+ @abstract Get the number of connected gamepads.
+ */
 int sapp_gamepad_count(void);
+/*!
+ @function sapp_gamepad_is_connected
+ @return True if a gamepad is connected.
+ @abstract Check if any gamepad is connected.
+ */
 bool sapp_gamepad_is_connected(void);
+/*!
+ @function sapp_gamepad_disconnect
+ @abstract Disconnect the first gamepad.
+ @discussion This function disconnects the first gamepad. It can be used to reset the gamepad state.
+ */
 void sapp_gamepad_disconnect(void);
+/*!
+ @function sapp_gamepad_disconnect_id
+ @param gid The gamepad ID to disconnect.
+ @abstract Disconnect a specific gamepad by ID.
+ @discussion This function disconnects a gamepad by its ID. It can be used to reset the state of a specific gamepad.
+ */
 void sapp_gamepad_disconnect_id(int gid);
+/*!
+ @function sapp_gamepad_is_connected_id
+ @param gid The gamepad ID to check.
+ @return True if the specified gamepad is connected.
+ @abstract Check if a specific gamepad is connected by ID.
+ */
 bool sapp_gamepad_is_connected_id(int gid);
+/*!
+ @function sapp_gamepad_is_button_down
+ @param button The gamepad button to check.
+ @return True if the specified gamepad button is currently pressed down.
+ @abstract Check if a gamepad button is currently pressed down.
+ */
 bool sapp_gamepad_is_button_down(int button);
+/*!
+ @function sapp_gamepad_is_button_down_id
+ @param gid The gamepad ID to check.
+ @param button The gamepad button to check.
+ @return True if the specified gamepad button is currently pressed down.
+ @abstract Check if a specific gamepad button is currently pressed down by ID.
+ */
 bool sapp_gamepad_is_button_down_id(int gid, int button);
+/*!
+ @function sapp_gamepad_is_button_up
+ @param button The gamepad button to check.
+ @return True if the specified gamepad button is not currently pressed down.
+ @abstract Check if a gamepad button is not currently pressed down.
+ */
 bool sapp_gamepad_is_button_up(int button);
+/*!
+ @function sapp_gamepad_is_button_up_id
+ @param gid The gamepad ID to check.
+ @param button The gamepad button to check.
+ @return True if the specified gamepad button is not currently pressed down.
+ @abstract Check if a specific gamepad button is not currently pressed down by ID.
+ */
 bool sapp_gamepad_is_button_up_id(int gid, int button);
+/*!
+ @function sapp_gamepad_was_button_pressed
+ @param button The gamepad button to check.
+ @return True if the specified gamepad button was pressed down in the last frame.
+ @abstract Check if a gamepad button was pressed down in the last frame.
+ */
 bool sapp_gamepad_was_button_pressed(int button);
+/*!
+ @function sapp_gamepad_was_button_pressed_id
+ @param gid The gamepad ID to check.
+ @param button The gamepad button to check.
+ @return True if the specified gamepad button was pressed down in the last frame.
+ @abstract Check if a specific gamepad button was pressed down in the last frame by ID.
+ */
 bool sapp_gamepad_was_button_pressed_id(int gid, int button);
+/*!
+ @function sapp_gamepad_was_button_released
+ @param button The gamepad button to check.
+ @return True if the specified gamepad button was released in the last frame.
+ @abstract Check if a gamepad button was released in the last frame.
+ */
 bool sapp_gamepad_was_button_released(int button);
+/*!
+ @function sapp_gamepad_was_button_released_id
+ @param gid The gamepad ID to check.
+ @param button The gamepad button to check.
+ @return True if the specified gamepad button was released in the last frame.
+ @abstract Check if a specific gamepad button was released in the last frame by ID.
+ */
 bool sapp_gamepad_was_button_released_id(int gid, int button);
+/*!
+ @function sapp_gamepad_axis_x
+ @return The x-axis value of the first gamepad.
+ @abstract Get the x-axis value of the first gamepad.
+ */
 float sapp_gamepad_axis_x(void);
+/*!
+ @function sapp_gamepad_axis_x_id
+ @param gid The gamepad ID to check.
+ @return The x-axis value of the specified gamepad.
+ @abstract Get the x-axis value of a specific gamepad by ID.
+ */
 float sapp_gamepad_axis_x_id(int gid);
+/*!
+ @function sapp_gamepad_axis_y
+ @return The y-axis value of the first gamepad.
+ @abstract Get the y-axis value of the first gamepad.
+ */
 float sapp_gamepad_axis_y(void);
+/*!
+ @function sapp_gamepad_axis_y_id
+ @param gid The gamepad ID to check.
+ @return The y-axis value of the specified gamepad.
+ @abstract Get the y-axis value of a specific gamepad by ID.
+ */
 float sapp_gamepad_axis_y_id(int gid);
+/*!
+ @function sapp_gamepad_axis_delta_x
+ @return The change in x-axis value of the first gamepad since the last frame.
+ @abstract Get the change in x-axis value of the first gamepad since the last frame.
+ */
 float sapp_gamepad_axis_delta_x(void);
+/*!
+ @function sapp_gamepad_axis_delta_x_id
+ @param gid The gamepad ID to check.
+ @return The change in x-axis value of the specified gamepad since the last frame.
+ @abstract Get the change in x-axis value of a specific gamepad by ID since the last frame.
+ */
 float sapp_gamepad_axis_delta_x_id(int gid);
+/*!
+ @function sapp_gamepad_axis_delta_y
+ @return The change in y-axis value of the first gamepad since the last frame.
+ @abstract Get the change in y-axis value of the first gamepad since the last frame.
+ */
 float sapp_gamepad_axis_delta_y(void);
+/*!
+ @function sapp_gamepad_axis_delta_y_id
+ @param gid The gamepad ID to check.
+ @return The change in y-axis value of the specified gamepad since the last frame.
+ @abstract Get the change in y-axis value of a specific gamepad by ID since the last frame.
+ */
 float sapp_gamepad_axis_delta_y_id(int gid);
 #endif
 
+/*!
+ @function sapp_input_is_str_down
+ @param str The string to check.
+ @return True if the string is currently pressed down.
+ @abstract Check if a string of keys is currently pressed down.
+ @discussion The string should be formatted as a sequence of key codes and modifier keys separated by commas or addition signs.
+             For example: "CTRL+A or CTRL+A,B or CTRL+SHIFT,C"
+ */
 bool sapp_input_is_str_down(const char *str);
+/*!
+ @function sapp_input_is_down
+ @param modifiers The modifier keys to check.
+ @param n The number of keys to check.
+ @param ... The key codes to check.
+ @return True if all the specified keys are currently pressed down with the given modifiers.
+ @abstract Check if multiple keys are currently pressed down with specific modifiers.
+ */
 bool sapp_input_is_down(int modifiers, int n, ...);
+/*!
+ @function sapp_parse_input_str
+ @param str The string to parse.
+ @param modifiers Pointer to an integer to store the modifiers.
+ @return A pointer to an array of integers representing the key codes.
+ @abstract Parse a string of input keys and modifiers.
+ */
 int* sapp_parse_input_str(const char *str, int *modifiers);
 
-#if defined(__cplusplus)
+#ifdef __cplusplus
 }
 #endif
 #endif // SOKOL_INPUT_HEADER
 
-#ifdef SOKOL_INPUT_IMPL
+#if defined(SOKOL_INPUT_IMPLEMENTATION) || defined(SOKOL_IMPL)
 #include <string.h>
 #include <stdint.h>
 #include <stddef.h>
@@ -3298,11 +3595,11 @@ int sapp_cursor_y(void) {
     return _input_state.input_current.cursor.y;
 }
 
-bool sapp_cursor_delta_x(void) {
+int sapp_cursor_delta_x(void) {
     return _input_state.input_current.cursor.x - _input_state.input_prev.cursor.x;
 }
 
-bool sapp_cursor_delta_y(void) {
+int sapp_cursor_delta_y(void) {
     return _input_state.input_current.cursor.y - _input_state.input_prev.cursor.y;
 }
 
